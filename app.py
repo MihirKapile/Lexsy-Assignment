@@ -11,7 +11,7 @@ load_dotenv()
 st.set_page_config(page_title="Lexi — Legal Document Filler", layout="wide")
 # configure Streamlit page
 
-st.title("Lexi — Your AI Legal Document Assistant (Groq Llama 3.3 70B)")
+st.title("Lexi — Your AI Legal Document Assistant")
 st.write(
     "Lexi helps you complete legal documents intelligently. Upload a `.docx` file with "
     "placeholders like [Company Name], [Effective Date], or $[Amount], and Lexi will "

@@ -3,8 +3,13 @@ from groq import Groq
 from io import BytesIO
 import json, re
 from docx import Document
+from dotenv import load_dotenv
+import os
+load_dotenv()
+# load environment variables from .env (optional)
 
 st.set_page_config(page_title="Lexi — Legal Document Filler", layout="wide")
+# configure Streamlit page
 
 st.title("Lexi — Your AI Legal Document Assistant (Groq Llama 3.3 70B)")
 st.write(
@@ -13,18 +18,25 @@ st.write(
     "analyze each placeholder, explain what it means, and chat with you to fill it out "
     "step by step.  You can generate the final document only when every field is filled."
 )
+# app description shown to users
 
-# ---------------- Sidebar ----------------
-groq_api_key = st.sidebar.text_input(
-    "Groq API Key", type="password", key="groq_api_key_sidebar"
-)
-if not groq_api_key:
-    st.warning("Please enter your Groq API key to start Lexi.")
-    st.stop()
-client = Groq(api_key=groq_api_key)
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-# ---------------- Helpers ----------------
+# initialize Groq API key (from env or sidebar)
+
+if GROQ_API_KEY:
+    client = Groq(api_key=GROQ_API_KEY)
+else:
+    st.sidebar.warning("Groq API key not found in .env file.")
+    groq_api_key = st.sidebar.text_input("Enter Groq API Key", type="password", key="groq_api_key_sidebar")
+    if not groq_api_key:
+        st.stop()
+    client = Groq(api_key=groq_api_key)
+
+# Groq client available as `client`
+
 def load_docx(data): return Document(data)
+# helper: load a .docx into python-docx Document
 
 def extract_placeholders_with_context(doc, window=1):
     regex = re.compile(r"(\$?\[+[^\[\]]+\]+)")
@@ -47,6 +59,7 @@ def extract_placeholders_with_context(doc, window=1):
             uniq.append(ph)
             seen.add(ph)
     return uniq, contexts
+# helper: extract placeholders and nearby paragraph context
 
 def replace_placeholders(doc,mapping):
     def repl(txt):
@@ -65,8 +78,10 @@ def replace_placeholders(doc,mapping):
                     c._tc.clear_content()
                     c.add_paragraph(repl(c.text))
     return doc
+# helper: replace placeholders in paragraphs and table cells
 
 def get_missing(values): return [k for k,v in values.items() if not v.strip()]
+# helper: list placeholders with empty values
 
 def analyze_placeholder_contexts(placeholders,contexts,client):
     results={}
@@ -94,9 +109,10 @@ Context: {ctx}
         except Exception as e:
             results[ph]={"description":f"Analysis failed: {e}","example":""}
     return results
+# helper: call LLM to analyze placeholder meanings (returns JSON or error)
 
-# ---------------- Upload ----------------
 uploaded = st.file_uploader("Upload your .docx document", type=["docx"], key="main_docx_uploader")
+# file uploader: user must upload a .docx to proceed
 if not uploaded:
     st.info("Please upload a .docx file to continue.")
     st.stop()
@@ -112,6 +128,7 @@ st.subheader(f"Detected {len(placeholders)} placeholders")
 # ---------------- AI Analysis ----------------
 st.write("Analyzing placeholder contexts with Groq Llama 3.3 70B …")
 analysis = analyze_placeholder_contexts(placeholders, contexts, client)
+# use LLM to analyze each placeholder (async call to Groq)
 
 st.subheader("AI-Generated Insights (Lexi’s Understanding)")
 for ph in placeholders:
@@ -122,13 +139,12 @@ for ph in placeholders:
         if info.get("example"):
             st.markdown(f"**Example:** {info['example']}")
 
-# ---------------- Session Init ----------------
 if "chat_history" not in st.session_state:
     st.session_state.chat_history=[]
 if "placeholder_values" not in st.session_state:
     st.session_state.placeholder_values={ph:"" for ph in placeholders}
+# session state holds chat history and current placeholder values
 
-# --------------- Lexi’s Personality ---------------
 def lexi_intro():
     intro_msg = (
         "Hi there! I’m **Lexi**, your AI legal assistant. "
@@ -138,12 +154,11 @@ def lexi_intro():
         "Once we’ve filled everything, I’ll generate your final document."
     )
     return intro_msg
+# initial assistant intro message
 
-# Show Lexi’s intro once after upload
 if not st.session_state.chat_history:
     st.session_state.chat_history.append({"role":"assistant","content":lexi_intro()})
 
-# ---------------- Chat Logic ----------------
 def groq_conversation(user_msg,history,placeholders,values,contexts,analysis):
     missing=get_missing(values)
     meanings="\n".join(f"{ph}: {analysis.get(ph,{}).get('description','')}" for ph in placeholders)
@@ -193,8 +208,8 @@ def groq_conversation(user_msg,history,placeholders,values,contexts,analysis):
     else:
         reply += "\n\n✅ Great! All placeholders are filled — I can generate the final document when you're ready."
     return reply, values
+# groq_conversation: build prompt, call LLM, parse JSON mapping and update values
 
-# ---------------- Chat UI ----------------
 st.header("Chat with Lexi")
 
 user_msg = st.chat_input("Type your response here …")
@@ -212,7 +227,6 @@ if user_msg:
     st.session_state.placeholder_values=updated
     st.session_state.chat_history.append({"role":"assistant","content":reply})
 
-# Render chat
 for msg in st.session_state.chat_history:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
@@ -260,7 +274,6 @@ def show_final_dialog(filled_doc):
     st.text("\n\n".join(preview))
     st.info("Close this dialog to continue chatting with Lexi.")
 
-# Show dialog only if all placeholders filled
 if not missing_now:
     st.success("✅ All placeholders are filled — Lexi can now generate the final document.")
     if st.button("Generate Final Document"):

@@ -78,7 +78,6 @@ Supports both local and deployed environments.
 ├── app.py                 # Main Streamlit application
 ├── requirements.txt       # Python dependencies
 ├── .env                   # (Not committed) Contains GROQ_API_KEY
-├── sample.docx            # Example input legal document
 └── README.md              # Project documentation
 ```
 
@@ -89,8 +88,8 @@ Supports both local and deployed environments.
 #### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/lexi-legal-assistant.git
-cd lexi-legal-assistant
+git clone https://github.com/MihirKapile/Lexsy-Assignment.git
+cd Lexsy-Assignment
 ```
 
 #### 2. Set Up Virtual Environment
